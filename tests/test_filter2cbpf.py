@@ -1,7 +1,6 @@
-from pycbpf import filter2cbpf as fc
-import libpcap as pcap
 import subprocess
-
+import libpcap as pcap
+from pycbpf import filter2cbpf as fc
 
 def bpf_insn_eq(insa :pcap.bpf_insn, insb :pcap.bpf_insn):
     if insa.code != insb.code:
@@ -24,9 +23,9 @@ def bpf_prog_eq(insa, insb):
 
 def tcpdump_args_to_bpf_insn(args):
     insn = []
-    p = subprocess.Popen(["tcpdump", "-ddd"] + args, shell=False, stdout=subprocess.PIPE)
-    output, _ = p.communicate()
-    len, ins_lines = output.splitlines()[0], output.splitlines()[1:]
+    proc = subprocess.Popen(["tcpdump", "-ddd"] + args, shell=False, stdout=subprocess.PIPE)
+    output, _ = proc.communicate()
+    _, ins_lines = output.splitlines()[0], output.splitlines()[1:]
     for line in ins_lines:
         code, jt, jf, k = line.split()
         insn.append(pcap.bpf_insn(int(code), int(jt), int(jf), int(k)))

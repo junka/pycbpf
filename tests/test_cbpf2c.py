@@ -1,4 +1,3 @@
-import libpcap as pcap
 import ctypes
 import socket
 import struct
@@ -26,14 +25,14 @@ int xdp_test_filter(struct xdp_md *ctx) {
 def checksum(data):
     n = len(data)
     m = n % 2
-    sum = 0
+    csum = 0
     for i in range(0, n - m , 2):
-        sum += (data[i]) + ((data[i+1]) << 8)
+        csum += (data[i]) + ((data[i+1]) << 8)
     if m:
-        sum += (data[-1])
-    sum = (sum >> 16) + (sum & 0xffff)
-    sum += (sum >> 16)
-    answer = ~sum & 0xffff
+        csum += (data[-1])
+    csum = (csum >> 16) + (csum & 0xffff)
+    csum += (csum >> 16)
+    answer = ~csum & 0xffff
     answer = answer >> 8 | (answer << 8 & 0xff00)
     return answer
 
@@ -48,8 +47,10 @@ def packet_generate(src_ip, dst_ip, proto):
     ip_ttl = 64
     ip_proto = proto
     ip_check = 0
-    eth_header = struct.pack("!6s6sH", b"\x8c\x98\xbf\xae\x54\x2c", b"\x8e\x92\xcc\xdd\xee\xff", 0x0800)
-    ip_header = struct.pack("!BBHHHBBH4s4s", 0x45, ip_tos, ip_tot_len, ip_id, ip_frag_off, ip_ttl, ip_proto, ip_check, ip_saddr, ip_daddr)
+    eth_header = struct.pack("!6s6sH", b"\x8c\x98\xbf\xae\x54\x2c", b"\x8e\x92\xcc\xdd\xee\xff",
+                            0x0800)
+    ip_header = struct.pack("!BBHHHBBH4s4s", 0x45, ip_tos, ip_tot_len, ip_id,
+                            ip_frag_off, ip_ttl, ip_proto, ip_check, ip_saddr, ip_daddr)
 
     if socket.IPPROTO_ICMP == proto:
         icmp_type = 8
@@ -159,7 +160,9 @@ def test_cbpf_2_c_geneve():
     protocol_type = 0x6558 # 16 bits
     vni = 1234 # 24 bits
     reserved2 = 0 # 8 bits
-    geneve_header = struct.pack(">BBHHHB", version << 6 | opt_len, oam << 7 | critical << 6 | reserved, protocol_type, vni >> 8, vni & 0xff, reserved2)
+    geneve_header = struct.pack(">BBHHHB", version << 6 | opt_len,
+                                oam << 7 | critical << 6 | reserved,
+                                protocol_type, vni >> 8, vni & 0xff, reserved2)
     payload = b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f"
 
     geneve_packet = geneve_header + payload
@@ -171,22 +174,24 @@ def test_cbpf_2_c_geneve():
     eth_header = struct.pack(">6s6sH", dst_mac, src_mac, eth_type)
 
     tos = 0 # 1 byte
-    total_length = 20 + 8 + len(geneve_packet) # 2 bytes, IP header + UDP header + Geneve packet length
+    total_length = 20 + 8 + len(geneve_packet)
     identification = 0 # 2 bytes
     flags = 0 # 3 bits
     fragment_offset = 0 # 13 bits
     ttl = 64 # 1 byte
     protocol = 17 # 1 byte, UDP protocol
-    checksum = 0 # 2 bytes, to be calculated later
+    ip_checksum = 0 # 2 bytes, to be calculated later
     src_ip = b"\xc0\xa8\x01\x01" # 4 bytes, 192.168.1.1
     dst_ip = b"\xc0\xa8\x01\x02" # 4 bytes, 192.168.1.2
-    ip_header = struct.pack(">BBHHHBBH4s4s", 0x45, tos, total_length, identification, flags << 13 | fragment_offset, ttl, protocol, checksum, src_ip, dst_ip)
+    ip_header = struct.pack(">BBHHHBBH4s4s", 0x45, tos, total_length, identification,
+                            flags << 13 | fragment_offset, ttl, protocol, ip_checksum,
+                            src_ip, dst_ip)
 
     src_port = 6081 # 2 bytes
     dst_port = 6081 # 2 bytes
     length = 8 + len(geneve_packet) # 2 bytes, UDP header + Geneve packet length
-    checksum = 0
-    udp_header = struct.pack(">HHHH", src_port, dst_port, length, checksum)
+    udp_checksum = 0
+    udp_header = struct.pack(">HHHH", src_port, dst_port, length, udp_checksum)
     outer_packet = eth_header + ip_header + udp_header + geneve_packet
     prog = filter2cbpf.cbpf_prog(["geneve"])
     prog_c = cbpf2c.cbpf_c(prog)

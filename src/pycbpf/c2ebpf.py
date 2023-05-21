@@ -1,6 +1,7 @@
 
 import time
 import ctypes
+import sys
 import argparse
 import libpcap as pcap
 from bcc import BPF
@@ -9,7 +10,7 @@ from bcc import BPF
 from .cbpf2c import cbpf_c
 from .filter2cbpf import cbpf_prog
 
-bpf_text = """
+bpftext = """
 
 #include <linux/skbuff.h>
 
@@ -85,36 +86,35 @@ cbpf_filter_func (const u8 *const data __attribute__((unused)), const u8 *const 
 
     if args.file is None:
         args.file = '-'
-    text = bpf_text%cfun
-    b = BPF(text = text, debug = 0)
+    text = bpftext%cfun
+    bctx = BPF(text = text, debug = 0)
 
     # func_name = "__netif_receive_skb"
     func_name = "dev_queue_xmit"
-    b.attach_kprobe(event=func_name, fn_name="filter_packets")
+    bctx.attach_kprobe(event=func_name, fn_name="filter_packets")
     pd = pcap.open_dead(pcap.DLT_EN10MB, 1000)
     dumper = pcap.dump_open(pd, ctypes.c_char_p(args.file.encode("utf-8")))
     if args.file != '-':
         print("Capturing packets from %s... Hit Ctrl-C to end" % func_name)
 
     def filter_events_cb(_cpu, data, _size):
-        e = ctypes.cast(data, ctypes.POINTER(FilterPacket)).contents
-        t = time.time()
-        sec = int(t)
-        usec = int((t - sec) * 1e6)
-        tv = pcap.timeval(sec, usec)
-        hdr = pcap.pkthdr(tv, 100, 100)
-        pcap.dump(ctypes.cast(dumper, ctypes.POINTER(ctypes.c_ubyte)), hdr, e.packet)
+        event = ctypes.cast(data, ctypes.POINTER(FilterPacket)).contents
+        now = time.time()
+        sec = int(now)
+        usec = int((now - sec) * 1e6)
+        tval = pcap.timeval(sec, usec)
+        hdr = pcap.pkthdr(tval, 100, 100)
+        pcap.dump(ctypes.cast(dumper, ctypes.POINTER(ctypes.c_ubyte)), hdr, event.packet)
 
-    b['filter_event'].open_perf_buffer(filter_events_cb)
+    bctx['filter_event'].open_perf_buffer(filter_events_cb)
 
     while True:
         try:
-            b.perf_buffer_poll()
-
+            bctx.perf_buffer_poll()
         except:
             pcap.dump_close(dumper)
             pcap.close(pd)
-            exit()
+            sys.exit()
 
 
 if __name__ == '__main__' :

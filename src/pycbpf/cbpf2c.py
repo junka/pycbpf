@@ -1,14 +1,11 @@
-
-import ctypes as ct
 import argparse
 import libpcap as pcap
-from bcc import BPF, USDT, USDTException, libbcc
 from .filter2cbpf import cbpf_prog
 
-# ref https://www.kernel.org/doc/Documentation/networking/filter.txt
 """
+BPF compile to C class
+ref https://www.kernel.org/doc/Documentation/networking/filter.txt
 The BPF architecture consists of the following basic elements:
-
   Element          Description
 
   A                32 bit wide accumulator
@@ -71,9 +68,7 @@ opcodes as defined in linux/filter.h stand for:
   txa                                   Copy X into A
 
   ret              4, 11                Return
-
 """
-
 class cbpf_c:
     def __init__(self, bpf):
         self._pc = 0
@@ -97,11 +92,15 @@ class cbpf_c:
 
     def _jump_cases(self, ins, cond, neg):
         if ins.jf == 0:
-            return "if (A %s %s) {goto %s;}" % (cond, self._alu_src(ins), self._jump_label(self._pc + 1 + ins.jt))
-        elif ins.jt == 0:
-            return "if (A %s %s) {goto %s;}" % (neg, self._alu_src(ins), self._jump_label(self._pc + 1 + ins.jf))
+            return "if (A %s %s) {goto %s;}" % (cond, self._alu_src(ins),
+                                                self._jump_label(self._pc + 1 + ins.jt))
+        if ins.jt == 0:
+            return "if (A %s %s) {goto %s;}" % (neg, self._alu_src(ins),
+                                                self._jump_label(self._pc + 1 + ins.jf))
         else:
-            return "if (A %s %s) {goto %s;} else { goto %s;}" % (cond, self._alu_src(ins), self._jump_label(self._pc + 1 + ins.jt), self._jump_label(self._pc + 1 + ins.jf))
+            return "if (A %s %s) {goto %s;} else { goto %s;}" % (cond, self._alu_src(ins),
+                                                    self._jump_label(self._pc + 1 + ins.jt),
+                                                    self._jump_label(self._pc + 1 + ins.jf))
 
     def _ld_dst(self, ins):
         if pcap.BPF_CLASS(ins.code) == pcap.BPF_LD:
@@ -134,9 +133,11 @@ class cbpf_c:
         if pcap.BPF_SIZE(ins.code) == pcap.BPF_B:
             return "%s%s = *(%s + %d);" % (check, self._ld_dst(ins), data, ins.k)
         elif pcap.BPF_SIZE(ins.code) == pcap.BPF_H:
-            return "%s%s = bpf_ntohs(*((u16 *)(%s + %d)));" % (check, self._ld_dst(ins), data, ins.k)
+            return "%s%s = bpf_ntohs(*((u16 *)(%s + %d)));" % (check, self._ld_dst(ins),
+                                                               data, ins.k)
         elif pcap.BPF_SIZE(ins.code) == pcap.BPF_W:
-            return "%s%s = bpf_ntohl(*((u32 *) (%s + %d)));" % (check, self._ld_dst(ins), data, ins.k)
+            return "%s%s = bpf_ntohl(*((u32 *) (%s + %d)));" % (check, self._ld_dst(ins),
+                                                                data, ins.k)
 
 
     # ref https://github.com/iovisor/bpf-docs/blob/master/eBPF.md
@@ -166,19 +167,19 @@ class cbpf_c:
     operand is src. The op field specifies which ALU or branch operation is to be performed.
     """
     def compile_cbpf_to_c(self) -> str:
-        Ctext = """\nstatic inline u32
+        ctext = """\nstatic inline u32
 cbpf_filter_func (const u8 *const data, const u8 *const data_end) {
 	__attribute__((unused)) u32 A, X, M[16];
 	__attribute__((unused)) const u8 *indirect;
 """
         for ins in self._bpf.ins:
-            Ctext += "\n"
+            ctext += "\n"
             if self._jumpLabels.get(self._pc) is not None:
-                Ctext += self._jumpLabels.get(self._pc) + ":\n"
-            Ctext += "\t%s" % self._convert_insn(ins)
+                ctext += self._jumpLabels.get(self._pc) + ":\n"
+            ctext += "\t%s" % self._convert_insn(ins)
             self._pc += 1
-        Ctext += "\n}" 
-        return Ctext
+        ctext += "\n}"
+        return ctext
 
     #ref https://github.com/the-tcpdump-group/libpcap/blob/master/bpf_filter.c
     # ref bpf(7) https://www3.physnet.uni-hamburg.de/physnet/Tru64-Unix/HTML/MAN/MAN7/0012____.HTM

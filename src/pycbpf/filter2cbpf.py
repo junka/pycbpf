@@ -1,6 +1,7 @@
+#!/bin/env python3
 # -*- coding: UTF-8 -*-
-import libpcap as pcap
 import ctypes as ct
+import libpcap as pcap
 
 
 class cbpf_prog:
