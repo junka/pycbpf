@@ -125,6 +125,11 @@ class cbpf_c:
             width = 4
         if data == "data":
             check = "if (data + %d + %d > data_end) { return 0; }\n\t" % (ins.k, width)
+        elif data == "indirect":
+            check = "if (data + X > data_end) {return 0;}\n\t"
+            check += "indirect = data + X;\n\t"
+            check += "if (indirect + %d + %d > data_end) {return 0;}\n\t" % (ins.k, width)
+
         if pcap.BPF_SIZE(ins.code) == pcap.BPF_B:
             return "%s%s = *(%s + %d);" % (check, self._ld_dst(ins), data, ins.k)
         elif pcap.BPF_SIZE(ins.code) == pcap.BPF_H:
