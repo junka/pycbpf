@@ -195,3 +195,15 @@ def test_cbpf_2_c_geneve():
     bpf_ctx = BPF(text=test_text, debug=4)
     func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type = BPF.XDP)
     assert run_filter_test(func.fd, outer_packet, 1)
+
+
+def test_cbpf_2_c_len():
+    prog = filter2cbpf.cbpf_prog(["len<=100"])
+    prog_c = cbpf2c.cbpf_c(prog)
+    cfun = prog_c.compile_cbpf_to_c()
+    test_text = bpf_text%cfun
+    bpf_ctx = BPF(text=test_text, debug=4)
+    func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type = BPF.XDP)
+
+    pkt = packet_generate("192.168.0.1", "10.23.12.33", socket.IPPROTO_UDP)
+    assert run_filter_test(func.fd, pkt, 1)
