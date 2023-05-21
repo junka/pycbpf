@@ -117,8 +117,14 @@ class cbpf_c:
 
     def _load_data_size(self, ins, data):
         check = ""
+        if pcap.BPF_SIZE(ins.code) == pcap.BPF_B:
+            width = 1
+        elif pcap.BPF_SIZE(ins.code) == pcap.BPF_H:
+            width = 2
+        elif pcap.BPF_SIZE(ins.code) == pcap.BPF_W:
+            width = 4
         if data == "data":
-            check = "if (data + %d > data_end) { return 0; }\n\t" % (ins.k)
+            check = "if (data + %d + %d > data_end) { return 0; }\n\t" % (ins.k, width)
         if pcap.BPF_SIZE(ins.code) == pcap.BPF_B:
             return "%s%s = *(%s + %d);" % (check, self._ld_dst(ins), data, ins.k)
         elif pcap.BPF_SIZE(ins.code) == pcap.BPF_H:

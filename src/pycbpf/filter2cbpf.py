@@ -27,10 +27,6 @@ class cbpf_prog:
         self._len = prog.bf_len
         self.ins = prog.bf_insns[:self._len]
 
-        # pcap.bpf_dump(prog, 3)
-        # for i in range(self._len):
-        #     print(self.ins[i].code)
-        
         # pcap.freecode(prog)
         pcap.close(pd)
         return 0
