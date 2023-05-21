@@ -180,6 +180,7 @@ cbpf_filter_func (const u8 *const data, const u8 *const data_end) {
         Ctext += "\n}" 
         return Ctext
 
+    #ref https://github.com/the-tcpdump-group/libpcap/blob/master/bpf_filter.c
     def _convert_insn(self, ins) -> str:
         # print("{0x%x, %d, %d, 0x%x}" % (ins.code, ins.jt, ins.jf, ins.k))
         if pcap.BPF_CLASS(ins.code) == pcap.BPF_LD or pcap.BPF_CLASS(ins.code) == pcap.BPF_LDX:
@@ -190,9 +191,9 @@ cbpf_filter_func (const u8 *const data, const u8 *const data_end) {
             elif pcap.BPF_MODE(ins.code) == pcap.BPF_ABS:
                 return self._load_data_size(ins, "data")
             elif pcap.BPF_MODE(ins.code) == pcap.BPF_MEM:
-                return "%s = M[%d]" % (self._ld_dst(ins), ins.k)
+                return "%s = M[%d];" % (self._ld_dst(ins), ins.k)
             elif pcap.BPF_MODE(ins.code) == pcap.BPF_LEN:
-                return "%s = data + %d" % (self._ld_dst(ins), ins.k)
+                return "%s = data + %d;" % (self._ld_dst(ins), ins.k)
             elif pcap.BPF_MODE(ins.code) == pcap.BPF_MSH:
                 return self._load_data_size(ins, "data") + "X = (X & 0xF)<< 2;"
 

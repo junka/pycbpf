@@ -136,6 +136,7 @@ def test_cbpf_2_c_icmp():
     assert run_filter_test(func.fd, pkt, 1)
 
 
+# test portrange with BPF_JGE
 def test_cbpf_2_c_portrange():
     prog = filter2cbpf.cbpf_prog(["portrange", "21-23"])
     prog_c = cbpf2c.cbpf_c(prog)
@@ -146,3 +147,51 @@ def test_cbpf_2_c_portrange():
 
     pkt = packet_generate("192.168.0.1", "10.23.12.33", socket.IPPROTO_UDP)
     assert run_filter_test(func.fd, pkt, 1)
+
+
+#test geneve with st/stx
+def test_cbpf_2_c_geneve():
+    version = 0 # 2 bits
+    opt_len = 0 # 6 bits
+    oam = 0 # 1 bit
+    critical = 0 # 1 bit
+    reserved = 0 # 6 bits
+    protocol_type = 0x6558 # 16 bits
+    vni = 1234 # 24 bits
+    reserved2 = 0 # 8 bits
+    geneve_header = struct.pack(">BBHHHB", version << 6 | opt_len, oam << 7 | critical << 6 | reserved, protocol_type, vni >> 8, vni & 0xff, reserved2)
+    payload = b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f"
+
+    geneve_packet = geneve_header + payload
+
+    dst_mac = b"\xaa\xbb\xcc\xdd\xee\xff" # 6 bytes
+    src_mac = b"\x11\x22\x33\x44\x55\x66" # 6 bytes
+    eth_type = 0x0800 # 2 bytes, IP protocol
+
+    eth_header = struct.pack(">6s6sH", dst_mac, src_mac, eth_type)
+
+    tos = 0 # 1 byte
+    total_length = 20 + 8 + len(geneve_packet) # 2 bytes, IP header + UDP header + Geneve packet length
+    identification = 0 # 2 bytes
+    flags = 0 # 3 bits
+    fragment_offset = 0 # 13 bits
+    ttl = 64 # 1 byte
+    protocol = 17 # 1 byte, UDP protocol
+    checksum = 0 # 2 bytes, to be calculated later
+    src_ip = b"\xc0\xa8\x01\x01" # 4 bytes, 192.168.1.1
+    dst_ip = b"\xc0\xa8\x01\x02" # 4 bytes, 192.168.1.2
+    ip_header = struct.pack(">BBHHHBBH4s4s", 0x45, tos, total_length, identification, flags << 13 | fragment_offset, ttl, protocol, checksum, src_ip, dst_ip)
+
+    src_port = 6081 # 2 bytes
+    dst_port = 6081 # 2 bytes
+    length = 8 + len(geneve_packet) # 2 bytes, UDP header + Geneve packet length
+    checksum = 0
+    udp_header = struct.pack(">HHHH", src_port, dst_port, length, checksum)
+    outer_packet = eth_header + ip_header + udp_header + geneve_packet
+    prog = filter2cbpf.cbpf_prog(["geneve"])
+    prog_c = cbpf2c.cbpf_c(prog)
+    cfun = prog_c.compile_cbpf_to_c()
+    test_text = bpf_text%cfun
+    bpf_ctx = BPF(text=test_text, debug=4)
+    func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type = BPF.XDP)
+    assert run_filter_test(func.fd, outer_packet, 1)
