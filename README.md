@@ -26,6 +26,19 @@ Command line below will generate the C program, which can be used directly in BC
 ```
 python3 -m pycbpf.cbpf2c <tcpdump expression>
 ```
+import package
+```
+from bcc import BPF
+from pycbpf import cbpf2c, filter2cbpf
+```
+generate cbpf and compile to C program, and enable BPF for trace
+```
+prog = filter2cbpf.cbpf_prog(["ip"])
+prog_c = cbpf2c.cbpf_c(prog)
+cfun = prog_c.compile_cbpf_to_c()
+test_text = bpf_text%cfun
+bpf_ctx = BPF(text=test_text, debug=4)
+```
 
 For example, filter ```ip``` packets, will generate C program
 ```
@@ -43,3 +56,5 @@ label3:
 }
 ```
 Use the inline function ```cbpf_filter_func``` in you trace program and handle return value properly.
+
+see ```c2ebpf.py``` as an example to save packets to pcap files

@@ -126,6 +126,7 @@ class cbpf_c:
         if data == "data":
             check = "if (data + %d + %d > data_end) { return 0; }\n\t" % (ins.k, width)
         elif data == "indirect":
+            # ref https://www.kernel.org/doc/Documentation/networking/filter.txt
             check = "if (data + X > data_end) {return 0;}\n\t"
             check += "indirect = data + X;\n\t"
             check += "if (indirect + %d + %d > data_end) {return 0;}\n\t" % (ins.k, width)
@@ -221,6 +222,8 @@ cbpf_filter_func (const u8 *const data, const u8 *const data_end) {
                 return self._jump_cases(ins, "==", "!=")
             if pcap.BPF_OP(ins.code) == pcap.BPF_JGT:
                 return self._jump_cases(ins, ">", "<=")
+            if pcap.BPF_OP(ins.code) == pcap.BPF_JGE:
+                return self._jump_cases(ins, ">=", "<")
             if pcap.BPF_OP(ins.code) == pcap.BPF_JSET:
                 return self._jump_cases(ins, "&", "|")
 

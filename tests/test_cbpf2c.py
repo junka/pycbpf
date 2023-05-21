@@ -10,14 +10,9 @@ bpf_text = """
 
 %s
 
-#define MAX_PACKET_OFF 0xffff
-
 int xdp_test_filter(struct xdp_md *ctx) {
 	void *data = (void *)(long)ctx->data;
 	void *data_end = (void *)(long)ctx->data_end;
-    if (data >= data_end) {
-		return 0;
-	}
 	
 	u32 ret = cbpf_filter_func(data, data_end);
 	if (!ret) {
@@ -42,7 +37,7 @@ def checksum(data):
     answer = answer >> 8 | (answer << 8 & 0xff00)
     return answer
 
-def packet_generate(src_ip, dst_ip):
+def packet_generate(src_ip, dst_ip, proto):
     ip_saddr = socket.inet_aton(src_ip)
     ip_daddr = socket.inet_aton(dst_ip)
 
@@ -51,22 +46,27 @@ def packet_generate(src_ip, dst_ip):
     ip_id = 54321
     ip_frag_off = 0
     ip_ttl = 64
-    ip_proto = socket.IPPROTO_ICMP
+    ip_proto = proto
     ip_check = 0
-
+    eth_header = struct.pack("!6s6sH", b"\x8c\x98\xbf\xae\x54\x2c", b"\x8e\x92\xcc\xdd\xee\xff", 0x0800)
     ip_header = struct.pack("!BBHHHBBH4s4s", 0x45, ip_tos, ip_tot_len, ip_id, ip_frag_off, ip_ttl, ip_proto, ip_check, ip_saddr, ip_daddr)
 
-    icmp_type = 8
-    icmp_code = 0
-    icmp_check = 0
-    icmp_id = 1
-    icmp_seq = 1
-    icmp_data = b"Hello world!"
-    icmp_header = struct.pack("!BBHHH", icmp_type, icmp_code, icmp_check, icmp_id, icmp_seq)
-    icmp_check = checksum(icmp_header + icmp_data)
-    icmp_header = struct.pack("!BBHHH", icmp_type, icmp_code, icmp_check, icmp_id, icmp_seq)
-    eth_header = struct.pack("!6s6sH", b"\x8c\x98\xbf\xae\x54\x2c", b"\x8e\x92\xcc\xdd\xee\xff", 0x0800)
-    packet = eth_header + ip_header + icmp_header + icmp_data
+    if socket.IPPROTO_ICMP == proto:
+        icmp_type = 8
+        icmp_code = 0
+        icmp_check = 0
+        icmp_id = 1
+        icmp_seq = 1
+        icmp_data = b"Hello world!"
+        icmp_header = struct.pack("!BBHHH", icmp_type, icmp_code, icmp_check, icmp_id, icmp_seq)
+        icmp_check = checksum(icmp_header + icmp_data)
+        icmp_header = struct.pack("!BBHHH", icmp_type, icmp_code, icmp_check, icmp_id, icmp_seq)
+        packet = eth_header + ip_header + icmp_header + icmp_data
+    elif socket.IPPROTO_UDP == proto:
+        # UDP header: src port ffff , dst port fffe , len c , check ffff
+        udp_header = struct.pack("!HHHH", 21, 65534, 12, 65535)
+        udp_data = b"Hello world!"
+        packet = eth_header + ip_header + udp_header + udp_data
     return packet
 
 def run_filter_test(fd, pkt, retval_expect):
@@ -96,7 +96,7 @@ def test_cbpf_2_c():
     bpf_ctx = BPF(text=test_text, debug=4)
     func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type = BPF.XDP)
 
-    pkt = packet_generate("192.168.0.1", "10.23.12.33")
+    pkt = packet_generate("192.168.0.1", "10.23.12.33", socket.IPPROTO_ICMP)
     assert run_filter_test(func.fd, pkt, 1)
 
 
@@ -108,7 +108,7 @@ def test_cbpf_2_c_host():
     bpf_ctx = BPF(text=test_text, debug=4)
     func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type = BPF.XDP)
 
-    pkt = packet_generate("192.168.0.1", "10.23.12.33")
+    pkt = packet_generate("192.168.0.1", "10.23.12.33", socket.IPPROTO_ICMP)
     assert run_filter_test(func.fd, pkt, 1)
 
 
@@ -120,7 +120,7 @@ def test_cbpf_2_c_host_not_match():
     bpf_ctx = BPF(text=test_text, debug=4)
     func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type = BPF.XDP)
 
-    pkt = packet_generate("192.168.0.1", "10.23.12.33")
+    pkt = packet_generate("192.168.0.1", "10.23.12.33", socket.IPPROTO_ICMP)
     assert run_filter_test(func.fd, pkt, 0)
 
 
@@ -132,5 +132,17 @@ def test_cbpf_2_c_icmp():
     bpf_ctx = BPF(text=test_text, debug=4)
     func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type = BPF.XDP)
 
-    pkt = packet_generate("192.168.0.1", "10.23.12.33")
+    pkt = packet_generate("192.168.0.1", "10.23.12.33", socket.IPPROTO_ICMP)
+    assert run_filter_test(func.fd, pkt, 1)
+
+
+def test_cbpf_2_c_portrange():
+    prog = filter2cbpf.cbpf_prog(["portrange", "21-23"])
+    prog_c = cbpf2c.cbpf_c(prog)
+    cfun = prog_c.compile_cbpf_to_c()
+    test_text = bpf_text%cfun
+    bpf_ctx = BPF(text=test_text, debug=4)
+    func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type = BPF.XDP)
+
+    pkt = packet_generate("192.168.0.1", "10.23.12.33", socket.IPPROTO_UDP)
     assert run_filter_test(func.fd, pkt, 1)
