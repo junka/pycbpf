@@ -20,3 +20,8 @@ classifiers = [
 [project.urls]
 "Homepage" = "https://github.com/junka/pycbpf"
 "Bug Tracker" = "https://github.com/junka/pycbpf/issues"
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
