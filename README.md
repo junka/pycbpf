@@ -15,9 +15,9 @@ You can save packets to a pcap file like below to sniffer packet from ```dev_que
 python3 -m pycbpf.c2ebpf -i eth0 -w file.pcap <tcpdump expresion>
 ```
 
-Or you can pipe output to stdout and use tcpdump analyze
+Or with no pcap file specified, you need to pipe output to tcpdump
 ```
-python3 -m pycbpf.c2ebpf -i eth0 <tcpdump expresion> | tcpdump -r -
+python3 -m pycbpf.c2ebpf -i eth0 <tcpdump expresion> | tcpdump -r - -nev
 ```
 
 

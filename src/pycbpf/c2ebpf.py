@@ -1,8 +1,10 @@
-
+import os
 import time
 import ctypes
 import sys
 import argparse
+import subprocess
+import tempfile
 import libpcap as pcap
 from bcc import BPF
 
@@ -68,8 +70,10 @@ filter packet from a raw socket
 """
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--interface", help="interface name to run tcpdump", required=True)
-    parser.add_argument("-w", "--file", help="pcap file to save packets")
+    parser.add_argument("-i", "--interface", dest="interface", required=True, help="interface name to run tcpdump")
+    parser.add_argument("-w", "--file", dest="file", default="-", help="pcap file to save packets")
+    parser.add_argument("-c", "--count", dest="count", type=int, default=sys.maxsize,
+                        help="number of packets to capture", )
     parser.add_argument('filter', nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
@@ -84,8 +88,6 @@ cbpf_filter_func (const u8 *const data __attribute__((unused)), const u8 *const 
         prog_c = cbpf_c(prog)
         cfun = prog_c.compile_cbpf_to_c()
 
-    if args.file is None:
-        args.file = '-'
     text = bpftext%cfun
     bctx = BPF(text = text, debug = 0)
 
@@ -93,11 +95,20 @@ cbpf_filter_func (const u8 *const data __attribute__((unused)), const u8 *const 
     func_name = "dev_queue_xmit"
     bctx.attach_kprobe(event=func_name, fn_name="filter_packets")
     pd = pcap.open_dead(pcap.DLT_EN10MB, 1000)
+    # if args.file == '-':
+    #     tmp = tempfile.NamedTemporaryFile()
+    #     dumper = pcap.dump_open(pd, ctypes.c_char_p(tmp.name.encode("utf-8")))
+    # else:
     dumper = pcap.dump_open(pd, ctypes.c_char_p(args.file.encode("utf-8")))
-    if args.file != '-':
-        print("Capturing packets from %s... Hit Ctrl-C to end" % func_name)
+
+    print("Capturing packets from %s... Hit Ctrl-C to end" % func_name)
+
+    global counter
+    counter = 0
 
     def filter_events_cb(_cpu, data, _size):
+        global counter
+        counter += 1
         event = ctypes.cast(data, ctypes.POINTER(FilterPacket)).contents
         now = time.time()
         sec = int(now)
@@ -108,13 +119,28 @@ cbpf_filter_func (const u8 *const data __attribute__((unused)), const u8 *const 
 
     bctx['filter_event'].open_perf_buffer(filter_events_cb)
 
-    while True:
+    # if args.file == '-':
+    #     proc = subprocess.Popen(["tcpdump", "-r", "-", "-nev"], stdin=tmp,
+    #                             stdout=subprocess.PIPE, shell=False)
+
+    while counter < args.count:
         try:
-            bctx.perf_buffer_poll()
+            bctx.perf_buffer_poll(timeout=1000)
+            # if args.file == '-' and proc.poll() is None:
+            #     output = proc.communicate(tmp.read())[0]
+            #     print(output)
+            #     line = proc.stdout.readline().strip(b'\n')
+            #     print(line.decode())
         except:
             pcap.dump_close(dumper)
             pcap.close(pd)
+            # if args.file == '-':
+            #     proc.stdout.close()
+            #     tmp.close()
             sys.exit()
+    print("%d packets cpatured" % counter)
+    pcap.dump_close(dumper)
+    pcap.close(pd)
 
 
 if __name__ == '__main__' :
