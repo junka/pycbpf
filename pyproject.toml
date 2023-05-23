@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pycbpf"
-version = "0.0.1"
+version = "0.0.2"
 authors = [
   { name="junka", email="wan.junjie@foxmail.com" },
 ]
@@ -15,6 +15,9 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
+]
+dependencies = [
+    "libpcap",
 ]
 
 [project.urls]
