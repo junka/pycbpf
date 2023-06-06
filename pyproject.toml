@@ -29,3 +29,8 @@ testpaths = [
     "tests"
 ]
 addopts = "--verbose"
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = '''missing-function-docstring,
+        missing-module-docstring,
+'''

@@ -26,17 +26,16 @@ def bpf_prog_eq(insa, insb):
 
 def tcpdump_args_to_bpf_insn(args):
     insn = []
-    proc = subprocess.Popen(["tcpdump", "-ddd"] + args,
-                            shell=False, stdout=subprocess.PIPE)
-    output, _ = proc.communicate()
-    _, ins_lines = output.splitlines()[0], output.splitlines()[1:]
+    ret = subprocess.run(["tcpdump", "-ddd"] + args,
+                            shell=False, stdout=subprocess.PIPE, check=True)
+    _, ins_lines = ret.stdout.splitlines()[0], ret.stdout.splitlines()[1:]
     for line in ins_lines:
-        code, jt, jf, k = line.split()
-        insn.append(pcap.bpf_insn(int(code), int(jt), int(jf), int(k)))
+        code, jump_t, jump_f, k = line.split()
+        insn.append(pcap.bpf_insn(int(code), int(jump_t), int(jump_f), int(k)))
     return insn
 
 
-def verify_CbpfProg(args):
+def verify_cbpf_prog(args):
     largs = args.split()
     prog = fc.CbpfProg(largs)
     ins = tcpdump_args_to_bpf_insn(largs)
@@ -50,5 +49,5 @@ def test_filter_2_cbpf():
              "src 1.1.1.1 or 1.1.1.2", "src 1.1.1.1 and (dst 1.1.1.2 or host 1.1.1.3) and port 80",
              "ether proto 0x0806", "tcp[tcpflags] & (tcp-syn|tcp-ack) != 0",
              "icmp[0] != 8 and icmp[0] != 0", "udp[42:4]=0xAC100009"]
-    for c in cases:
-        assert verify_CbpfProg(c)
+    for case in cases:
+        assert verify_cbpf_prog(case)
