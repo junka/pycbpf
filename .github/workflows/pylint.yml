@@ -19,7 +19,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install pylint
         pip install libpcap
-        apt-get install bpfcc-tools linux-headers-$(uname -r)
+        sudo apt-get install -y bpfcc-tools linux-headers-$(uname -r)
     - name: Analysing the code with pylint
       run: |
         pylint $(git ls-files '*.py')
