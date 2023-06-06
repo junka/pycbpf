@@ -65,8 +65,8 @@ your_func()
 
 """
 
-prog = filter2cbpf.cbpf_prog(["ip"])
-prog_c = cbpf2c.cbpf_c(prog)
+prog = filter2cbpf.CbpfProg(["ip"])
+prog_c = cbpf2c.CbpfC(prog)
 cfun = prog_c.compile_cbpf_to_c()
 test_text = bpf_text%cfun
 bpf_ctx = BPF(text=test_text, debug=0)

@@ -1,18 +1,19 @@
-import os
+"""
+The function captures packets from a network interface, applies a C Berkeley Packet Filter (cbpf) to
+filter packets, and saves the filtered packets to a pcap file.
+"""
 import time
 import ctypes
 import sys
 import argparse
-import subprocess
-import tempfile
 import libpcap as pcap
 from bcc import BPF
 
 
-from .cbpf2c import cbpf_c
-from .filter2cbpf import cbpf_prog
+from .cbpf2c import CbpfC
+from .filter2cbpf import CbpfProg
 
-bpftext = """
+BPFTEXT = """
 
 #include <linux/skbuff.h>
 
@@ -57,21 +58,28 @@ int filter_packets (struct pt_regs *ctx) {
 
 """
 
-class FilterPacket(ctypes.Structure):
+
+class FilterPacket(ctypes.Structure):  # pylint: disable=too-few-public-methods
+    """
+    The class `FilterPacket` defines a structure with a single field `packet` that is
+    an array of 128 unsigned bytes.
+    """
     _fields_ = [
         ("packet", ctypes.c_ubyte * 128)
     ]
 
 
-"""
-ref https://github.com/iovisor/bcc/blob/master/examples/networking/dns_matching/dns_matching.py
-ret https://github.com/iovisor/bcc/blob/master/examples/tracing/undump.py
-filter packet from a raw socket
-"""
 def main():
+    """
+    ref https://github.com/iovisor/bcc/blob/master/examples/networking/dns_matching/dns_matching.py
+    ret https://github.com/iovisor/bcc/blob/master/examples/tracing/undump.py
+    filter packet from a raw socket
+    """
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--interface", dest="interface", required=True, help="interface name to run tcpdump")
-    parser.add_argument("-w", "--file", dest="file", default="-", help="pcap file to save packets")
+    parser.add_argument("-i", "--interface", dest="interface", required=True,
+                        help="interface name to run tcpdump")
+    parser.add_argument("-w", "--file", dest="file",
+                        default="-", help="pcap file to save packets")
     parser.add_argument("-c", "--count", dest="count", type=int, default=sys.maxsize,
                         help="number of packets to capture", )
     parser.add_argument('filter', nargs=argparse.REMAINDER)
@@ -84,30 +92,30 @@ cbpf_filter_func (const u8 *const data __attribute__((unused)), const u8 *const 
 }
 """
     else:
-        prog = cbpf_prog(args.filter)
-        prog_c = cbpf_c(prog)
+        prog = CbpfProg(args.filter)
+        prog_c = CbpfC(prog)
         cfun = prog_c.compile_cbpf_to_c()
 
-    text = bpftext%cfun
-    bctx = BPF(text = text, debug = 0)
+    text = BPFTEXT % cfun
+    bctx = BPF(text=text, debug=0)
 
     # func_name = "__netif_receive_skb"
     func_name = "dev_queue_xmit"
     bctx.attach_kprobe(event=func_name, fn_name="filter_packets")
-    pd = pcap.open_dead(pcap.DLT_EN10MB, 1000)
+    pcap_dev = pcap.open_dead(pcap.DLT_EN10MB, 1000)
     # if args.file == '-':
     #     tmp = tempfile.NamedTemporaryFile()
-    #     dumper = pcap.dump_open(pd, ctypes.c_char_p(tmp.name.encode("utf-8")))
+    #     dumper = pcap.dump_open(pcap_dev, ctypes.c_char_p(tmp.name.encode("utf-8")))
     # else:
-    dumper = pcap.dump_open(pd, ctypes.c_char_p(args.file.encode("utf-8")))
+    dumper = pcap.dump_open(
+        pcap_dev, ctypes.c_char_p(args.file.encode("utf-8")))
 
-    print("Capturing packets from %s... Hit Ctrl-C to end" % func_name)
+    print("Capturing packets from {func_name}... Hit Ctrl-C to end")
 
-    global counter
     counter = 0
 
     def filter_events_cb(_cpu, data, _size):
-        global counter
+        nonlocal counter
         counter += 1
         event = ctypes.cast(data, ctypes.POINTER(FilterPacket)).contents
         now = time.time()
@@ -115,7 +123,8 @@ cbpf_filter_func (const u8 *const data __attribute__((unused)), const u8 *const 
         usec = int((now - sec) * 1e6)
         tval = pcap.timeval(sec, usec)
         hdr = pcap.pkthdr(tval, 100, 100)
-        pcap.dump(ctypes.cast(dumper, ctypes.POINTER(ctypes.c_ubyte)), hdr, event.packet)
+        pcap.dump(ctypes.cast(dumper, ctypes.POINTER(
+            ctypes.c_ubyte)), hdr, event.packet)
 
     bctx['filter_event'].open_perf_buffer(filter_events_cb)
 
@@ -131,17 +140,17 @@ cbpf_filter_func (const u8 *const data __attribute__((unused)), const u8 *const 
             #     print(output)
             #     line = proc.stdout.readline().strip(b'\n')
             #     print(line.decode())
-        except:
+        except KeyboardInterrupt:
             pcap.dump_close(dumper)
-            pcap.close(pd)
+            pcap.close(pcap_dev)
             # if args.file == '-':
             #     proc.stdout.close()
             #     tmp.close()
             sys.exit()
-    print("%d packets cpatured" % counter)
+    print("{counter} packets cpatured")
     pcap.dump_close(dumper)
-    pcap.close(pd)
+    pcap.close(pcap_dev)
 
 
-if __name__ == '__main__' :
+if __name__ == '__main__':
     main()
