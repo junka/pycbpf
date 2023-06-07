@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         python-version: ["3.8", "3.9", "3.10"]
@@ -16,10 +16,10 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
+        sudo apt-get install -y bpfcc-tools linux-headers-$(uname -r)
         python -m pip install --upgrade pip
         pip install pylint
         pip install libpcap
-        sudo apt-get install -y bpfcc-tools linux-headers-$(uname -r)
     - name: Analysing the code with pylint
       run: |
         pylint $(git ls-files '*.py')
