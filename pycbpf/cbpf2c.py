@@ -118,7 +118,7 @@ class CbpfC:  # pylint: disable=too-few-public-methods
     @classmethod
     def _alu_src(cls, ins):
         if pcap.BPF_SRC(ins.code) == pcap.BPF_K:
-            return "0x{ins.k:x}"
+            return f"0x{ins.k:x}"
         # elif pcap.BPF_SRC(ins.code) == pcap.BPF_X:
         return "X"
 
