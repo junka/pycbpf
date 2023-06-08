@@ -28,7 +28,7 @@ dependencies = [
 testpaths = [
     "tests"
 ]
-addopts = "--verbose"
+addopts = "--verbose --cov pycbpf/"
 
 [tool.pylint."MESSAGES CONTROL"]
 disable = '''missing-function-docstring,

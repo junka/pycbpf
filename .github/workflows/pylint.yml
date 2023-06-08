@@ -21,6 +21,7 @@ jobs:
         pip install pylint
         pip install libpcap
         pip install pytest
+        pip install pytest-cov
         ln -s /usr/lib/python3/dist-packages/bcc $pythonLocation/lib/python${{ matrix.python-version }}/site-packages/
     - name: Analysing the code with pylint
       run: |
