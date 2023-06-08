@@ -1,4 +1,4 @@
-### About pycbpf
+### About pycbpf ![ci](https://github.com/junka/pycbpf/actions/workflows/pylint.yml/badge.svg)
 ---
 
 Inspired by [cbpfc](https://github.com/cloudflare/cbpfc).
