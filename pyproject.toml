@@ -34,3 +34,6 @@ addopts = "--verbose --cov pycbpf/"
 disable = '''missing-function-docstring,
         missing-module-docstring,
 '''
+
+[tool.black]
+line-length = 88

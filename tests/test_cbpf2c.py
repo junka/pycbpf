@@ -12,7 +12,7 @@ BPF_TEXT = """
 int xdp_test_filter(struct xdp_md *ctx) {
 	void *data = (void *)(long)ctx->data;
 	void *data_end = (void *)(long)ctx->data_end;
-	
+
 	u32 ret = cbpf_filter_func(data, data_end);
 	if (!ret) {
 		return 0;
@@ -29,13 +29,13 @@ def checksum(data):
     left = length % 2
     csum = 0
     for i in range(0, length - left, 2):
-        csum += (data[i]) + ((data[i+1]) << 8)
+        csum += (data[i]) + ((data[i + 1]) << 8)
     if left:
-        csum += (data[-1])
-    csum = (csum >> 16) + (csum & 0xffff)
-    csum += (csum >> 16)
-    answer = ~csum & 0xffff
-    answer = answer >> 8 | (answer << 8 & 0xff00)
+        csum += data[-1]
+    csum = (csum >> 16) + (csum & 0xFFFF)
+    csum += csum >> 16
+    answer = ~csum & 0xFFFF
+    answer = answer >> 8 | (answer << 8 & 0xFF00)
     return answer
 
 
@@ -43,19 +43,20 @@ def packet_generate(src_ip, dst_ip, proto):
     ip_saddr = socket.inet_aton(src_ip)
     ip_daddr = socket.inet_aton(dst_ip)
 
-    eth_header = struct.pack("!6s6sH", b"\x8c\x98\xbf\xae\x54\x2c", b"\x8e\x92\xcc\xdd\xee\xff",
-                             0x0800)
+    eth_header = struct.pack(
+        "!6s6sH", b"\x8c\x98\xbf\xae\x54\x2c", b"\x8e\x92\xcc\xdd\xee\xff", 0x0800
+    )
     # ipvl, ip_tos, ip_tot_len, ip_id, ip_frag_off, ip_ttl, ip_proto, ip_check, ip_sa, ip_da
-    ip_header = struct.pack("!BBHHHBBH4s4s", 0x45, 0, 0, 54321, 0, 64, proto, 0, ip_saddr, ip_daddr)
+    ip_header = struct.pack(
+        "!BBHHHBBH4s4s", 0x45, 0, 0, 54321, 0, 64, proto, 0, ip_saddr, ip_daddr
+    )
 
     if socket.IPPROTO_ICMP == proto:
         icmp_check = 0
         icmp_data = b"Hello world!"
-        icmp_header = struct.pack(
-            "!BBHHH", 8, 0, icmp_check, 1, 1)
+        icmp_header = struct.pack("!BBHHH", 8, 0, icmp_check, 1, 1)
         icmp_check = checksum(icmp_header + icmp_data)
-        icmp_header = struct.pack(
-            "!BBHHH", 8, 0, icmp_check, 1, 1)
+        icmp_header = struct.pack("!BBHHH", 8, 0, icmp_check, 1, 1)
         packet = eth_header + ip_header + icmp_header + icmp_data
     elif socket.IPPROTO_UDP == proto:
         # UDP header: src port ffff , dst port fffe , len c , check ffff
@@ -73,12 +74,16 @@ def run_filter_test(func_fd, pkt, retval_expect):
     retval = ctypes.c_uint32()
     duration = ctypes.c_uint32()
 
-    ret = libbcc.lib.bpf_prog_test_run(func_fd, 1,
-                                       ctypes.byref(data), size,
-                                       ctypes.byref(data_out),
-                                       ctypes.byref(size_out),
-                                       ctypes.byref(retval),
-                                       ctypes.byref(duration))
+    ret = libbcc.lib.bpf_prog_test_run(
+        func_fd,
+        1,
+        ctypes.byref(data),
+        size,
+        ctypes.byref(data_out),
+        ctypes.byref(size_out),
+        ctypes.byref(retval),
+        ctypes.byref(duration),
+    )
     if ret != 0:
         return False
     return retval.value == retval_expect
@@ -146,8 +151,8 @@ def test_cbpf_2_c_portrange():
 
 
 # test geneve with st/stx
-def test_cbpf_2_c_geneve(): # pylint: disable=too-many-locals
-    geneve_header = struct.pack(">BBHHHB", 0, 0, 0x6558, 1234 >> 8, 1234 & 0xff, 0)
+def test_cbpf_2_c_geneve():  # pylint: disable=too-many-locals
+    geneve_header = struct.pack(">BBHHHB", 0, 0, 0x6558, 1234 >> 8, 1234 & 0xFF, 0)
     payload = b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f"
 
     geneve_packet = geneve_header + payload
@@ -159,8 +164,19 @@ def test_cbpf_2_c_geneve(): # pylint: disable=too-many-locals
 
     src_ip = b"\xc0\xa8\x01\x01"  # 4 bytes, 192.168.1.1
     dst_ip = b"\xc0\xa8\x01\x02"  # 4 bytes, 192.168.1.2
-    ip_header = struct.pack(">BBHHHBBH4s4s", 0x45, 0, 20 + 8 + len(geneve_packet), 0,
-                            0, 64, 17, 0, src_ip, dst_ip)
+    ip_header = struct.pack(
+        ">BBHHHBBH4s4s",
+        0x45,
+        0,
+        20 + 8 + len(geneve_packet),
+        0,
+        0,
+        64,
+        17,
+        0,
+        src_ip,
+        dst_ip,
+    )
 
     udp_header = struct.pack(">HHHH", 6081, 6081, 8 + len(geneve_packet), 0)
     outer_packet = eth_header + ip_header + udp_header + geneve_packet

@@ -7,7 +7,7 @@ import ctypes as ct
 import libpcap as pcap
 
 
-class CbpfProg():  # pylint: disable=too-few-public-methods
+class CbpfProg:  # pylint: disable=too-few-public-methods
     """
     The `CbpfProg` class converts a tcpdump filter expression into a bpf_insn list.
     """
@@ -33,7 +33,7 @@ class CbpfProg():  # pylint: disable=too-few-public-methods
         if not pcap.bpf_validate(prog.bf_insns, prog.bf_len):
             print("Filter doesn't pass validation")
         self._len = prog.bf_len
-        self.ins = prog.bf_insns[:self._len]
+        self.ins = prog.bf_insns[: self._len]
 
         # pcap.freecode(prog)
         pcap.close(pcap_dev)

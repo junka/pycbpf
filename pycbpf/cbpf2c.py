@@ -1,6 +1,7 @@
 """
-The above code defines a class `CbpfC` that can compile a BPF filter program into a C function, and
-includes a main function that takes command line arguments to generate and print the C function.
+The above code defines a class `CbpfC` that can compile a BPF filter program
+into a C function, and includes a main function that takes command line
+arguments to generate and print the C function.
 """
 import argparse
 import libpcap as pcap
@@ -141,7 +142,9 @@ class CbpfC:  # pylint: disable=too-few-public-methods
         if pcap.BPF_SIZE(ins.code) == pcap.BPF_B:
             return f"{check}{self._ld_dst(ins)} = *({data} + {ins.k});"
         if pcap.BPF_SIZE(ins.code) == pcap.BPF_H:
-            return f"{check}{self._ld_dst(ins)} = bpf_ntohs(*((u16 *)({data} + {ins.k})));"
+            return (
+                f"{check}{self._ld_dst(ins)} = bpf_ntohs(*((u16 *)({data} + {ins.k})));"
+            )
         if pcap.BPF_SIZE(ins.code) == pcap.BPF_W:
             return f"{check}{self._ld_dst(ins)} = bpf_ntohl(*((u32 *) ({data} + {ins.k})));"
         return ""
@@ -158,8 +161,8 @@ class CbpfC:  # pylint: disable=too-few-public-methods
         BPF_SIZE
         BPF_MODE
         BPF_CLASS
-        The sz field specifies the size of the memory location. The mde field is the
-        memory access mode. uBPF only supports the generic "MEM" access mode.
+        The sz field specifies the size of memory location. The 'mde' field is
+        memory access mode.
 
         ALU/ALU64/JMP opcode structure:
 
@@ -170,8 +173,9 @@ class CbpfC:  # pylint: disable=too-few-public-methods
         BPF_OP
         BPF_SRC
         BPF_CLASS
-        If the s bit is zero, then the source operand is imm. If s is one, then the source
-        operand is src. The op field specifies which ALU or branch operation is to be performed.
+        If the s bit is zero, then the source operand is imm. If s is one, then
+        the source operand is src. The op field specifies which ALU or branch
+        operation is to be performed.
         """
         ctext = """\nstatic inline u32
 cbpf_filter_func (const u8 *const data, const u8 *const data_end) {
@@ -188,9 +192,12 @@ cbpf_filter_func (const u8 *const data, const u8 *const data_end) {
         return ctext
 
     # ref https://github.com/the-tcpdump-group/libpcap/blob/master/bpf_filter.c
-    # ref bpf(7) https://www3.physnet.uni-hamburg.de/physnet/Tru64-Unix/HTML/MAN/MAN7/0012____.HTM
-    def _convert_insn(self, ins) -> str:  # pylint: disable=too-many-return-statements,too-many-branches
-        if pcap.BPF_CLASS(ins.code) == pcap.BPF_LD or pcap.BPF_CLASS(ins.code) == pcap.BPF_LDX:
+    def _convert_insn(self, ins):
+        # pylint: disable=too-many-return-statements,too-many-branches
+        if (
+            pcap.BPF_CLASS(ins.code) == pcap.BPF_LD
+            or pcap.BPF_CLASS(ins.code) == pcap.BPF_LDX
+        ):
             if pcap.BPF_MODE(ins.code) == pcap.BPF_IMM:
                 mstr = f"{self._ld_dst(ins)} = {ins.k};"
             elif pcap.BPF_MODE(ins.code) == pcap.BPF_IND:
@@ -220,9 +227,10 @@ cbpf_filter_func (const u8 *const data, const u8 *const data_end) {
             return alustr
 
         if pcap.BPF_CLASS(ins.code) == pcap.BPF_JMP:
-            #  Conditional jt/jf targets replaced with jt/fall-through:
-            # While the original design has constructs such as "if (cond) jump_true;
-            # else jump_false;", they are being replaced into alternative constructs like
+            # Conditional jt/jf targets replaced with jt/fall-through:
+            # While the original design has constructs such as
+            # "if (cond) jump_true; else jump_false;",
+            # they are being replaced into alternative constructs like
             # "if (cond) jump_true; /* else fall-through */".
             if pcap.BPF_OP(ins.code) == pcap.BPF_JA:
                 jstr = f"goto {self._jump_label(ins.k)}"
@@ -259,9 +267,8 @@ def main():
     a C function for a given filter.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--interface",
-                        help="interface name to run tcpdump")
-    parser.add_argument('filter', nargs=argparse.REMAINDER)
+    parser.add_argument("-i", "--iface", help="interface name to run tcpdump")
+    parser.add_argument("filter", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.filter and len(args.filter) > 0:
         prog = CbpfProg(args.filter)
@@ -270,5 +277,5 @@ def main():
         print(cfun)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

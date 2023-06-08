@@ -1,6 +1,7 @@
 """
-The function captures packets from a network interface, applies a C Berkeley Packet Filter (cbpf) to
-filter packets, and saves the filtered packets to a pcap file.
+The function captures packets from a network interface, applies a C Berkeley
+Packet Filter (cbpf) to filter packets, and saves the filtered packets to a
+pcap file.
 """
 import time
 import ctypes
@@ -64,9 +65,8 @@ class FilterPacket(ctypes.Structure):  # pylint: disable=too-few-public-methods
     The class `FilterPacket` defines a structure with a single field `packet` that is
     an array of 128 unsigned bytes.
     """
-    _fields_ = [
-        ("packet", ctypes.c_ubyte * 128)
-    ]
+
+    _fields_ = [("packet", ctypes.c_ubyte * 128)]
 
 
 def main():
@@ -76,13 +76,25 @@ def main():
     filter packet from a raw socket
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--interface", dest="interface", required=True,
-                        help="interface name to run tcpdump")
-    parser.add_argument("-w", "--file", dest="file",
-                        default="-", help="pcap file to save packets")
-    parser.add_argument("-c", "--count", dest="count", type=int, default=sys.maxsize,
-                        help="number of packets to capture", )
-    parser.add_argument('filter', nargs=argparse.REMAINDER)
+    parser.add_argument(
+        "-i",
+        "--interface",
+        dest="interface",
+        required=True,
+        help="interface name to run tcpdump",
+    )
+    parser.add_argument(
+        "-w", "--file", dest="file", default="-", help="pcap file to save packets"
+    )
+    parser.add_argument(
+        "-c",
+        "--count",
+        dest="count",
+        type=int,
+        default=sys.maxsize,
+        help="number of packets to capture",
+    )
+    parser.add_argument("filter", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
     if args.filter is None or len(args.filter) == 0:
@@ -107,10 +119,9 @@ cbpf_filter_func (const u8 *const data __attribute__((unused)), const u8 *const 
     #     tmp = tempfile.NamedTemporaryFile()
     #     dumper = pcap.dump_open(pcap_dev, ctypes.c_char_p(tmp.name.encode("utf-8")))
     # else:
-    dumper = pcap.dump_open(
-        pcap_dev, ctypes.c_char_p(args.file.encode("utf-8")))
+    dumper = pcap.dump_open(pcap_dev, ctypes.c_char_p(args.file.encode("utf-8")))
 
-    print("Capturing packets from {func_name}... Hit Ctrl-C to end")
+    print(f"Capturing packets from {func_name}... Hit Ctrl-C to end")
 
     counter = 0
 
@@ -123,10 +134,11 @@ cbpf_filter_func (const u8 *const data __attribute__((unused)), const u8 *const 
         usec = int((now - sec) * 1e6)
         tval = pcap.timeval(sec, usec)
         hdr = pcap.pkthdr(tval, 100, 100)
-        pcap.dump(ctypes.cast(dumper, ctypes.POINTER(
-            ctypes.c_ubyte)), hdr, event.packet)
+        pcap.dump(
+            ctypes.cast(dumper, ctypes.POINTER(ctypes.c_ubyte)), hdr, event.packet
+        )
 
-    bctx['filter_event'].open_perf_buffer(filter_events_cb)
+    bctx["filter_event"].open_perf_buffer(filter_events_cb)
 
     # if args.file == '-':
     #     proc = subprocess.Popen(["tcpdump", "-r", "-", "-nev"], stdin=tmp,
@@ -147,10 +159,10 @@ cbpf_filter_func (const u8 *const data __attribute__((unused)), const u8 *const 
             #     proc.stdout.close()
             #     tmp.close()
             sys.exit()
-    print("{counter} packets cpatured")
+    print(f"{counter} packets cpatured")
     pcap.dump_close(dumper)
     pcap.close(pcap_dev)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
