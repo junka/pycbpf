@@ -36,6 +36,7 @@ Steps to use it in python:
 ```
 pip3 install pycbpf
 ```
+python version should be 3.7 above
 
 ```
 from bcc import BPF

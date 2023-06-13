@@ -94,7 +94,7 @@ def test_cbpf_2_c():
     prog_c = cbpf2c.CbpfC(prog)
     cfun = prog_c.compile_cbpf_to_c()
     test_text = BPF_TEXT % cfun
-    bpf_ctx = BPF(text=test_text, debug=4)
+    bpf_ctx = BPF(text=test_text.encode(), debug=4)
     func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type=BPF.XDP)
 
     pkt = packet_generate("192.168.0.1", "10.23.12.33", socket.IPPROTO_ICMP)
@@ -106,7 +106,7 @@ def test_cbpf_2_c_host():
     prog_c = cbpf2c.CbpfC(prog)
     cfun = prog_c.compile_cbpf_to_c()
     test_text = BPF_TEXT % cfun
-    bpf_ctx = BPF(text=test_text, debug=4)
+    bpf_ctx = BPF(text=test_text.encode(), debug=4)
     func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type=BPF.XDP)
 
     pkt = packet_generate("192.168.0.1", "10.23.12.33", socket.IPPROTO_ICMP)
@@ -118,7 +118,7 @@ def test_cbpf_2_c_host_not_match():
     prog_c = cbpf2c.CbpfC(prog)
     cfun = prog_c.compile_cbpf_to_c()
     test_text = BPF_TEXT % cfun
-    bpf_ctx = BPF(text=test_text, debug=4)
+    bpf_ctx = BPF(text=test_text.encode(), debug=4)
     func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type=BPF.XDP)
 
     pkt = packet_generate("192.168.0.1", "10.23.12.33", socket.IPPROTO_ICMP)
@@ -130,7 +130,7 @@ def test_cbpf_2_c_icmp():
     prog_c = cbpf2c.CbpfC(prog)
     cfun = prog_c.compile_cbpf_to_c()
     test_text = BPF_TEXT % cfun
-    bpf_ctx = BPF(text=test_text, debug=4)
+    bpf_ctx = BPF(text=test_text.encode(), debug=4)
     func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type=BPF.XDP)
 
     pkt = packet_generate("192.168.0.1", "10.23.12.33", socket.IPPROTO_ICMP)
@@ -143,7 +143,7 @@ def test_cbpf_2_c_portrange():
     prog_c = cbpf2c.CbpfC(prog)
     cfun = prog_c.compile_cbpf_to_c()
     test_text = BPF_TEXT % cfun
-    bpf_ctx = BPF(text=test_text, debug=4)
+    bpf_ctx = BPF(text=test_text.encode(), debug=4)
     func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type=BPF.XDP)
 
     pkt = packet_generate("192.168.0.1", "10.23.12.33", socket.IPPROTO_UDP)
@@ -183,7 +183,7 @@ def test_cbpf_2_c_geneve():  # pylint: disable=too-many-locals
     prog = filter2cbpf.CbpfProg(["geneve"])
     prog_c = cbpf2c.CbpfC(prog)
     cfun = prog_c.compile_cbpf_to_c()
-    bpf_ctx = BPF(text=BPF_TEXT % cfun, debug=4)
+    bpf_ctx = BPF(text=(BPF_TEXT % cfun).encode(), debug=4)
     func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type=BPF.XDP)
     assert run_filter_test(func.fd, outer_packet, 1)
 
@@ -193,8 +193,60 @@ def test_cbpf_2_c_len():
     prog_c = cbpf2c.CbpfC(prog)
     cfun = prog_c.compile_cbpf_to_c()
     test_text = BPF_TEXT % cfun
-    bpf_ctx = BPF(text=test_text, debug=4)
+    bpf_ctx = BPF(text=test_text.encode(), debug=4)
     func = bpf_ctx.load_func(func_name=b"xdp_test_filter", prog_type=BPF.XDP)
 
     pkt = packet_generate("192.168.0.1", "10.23.12.33", socket.IPPROTO_UDP)
     assert run_filter_test(func.fd, pkt, 1)
+
+
+def test_cbpf2c_main(capsys):
+    cbpf2c.main(["-i", "any", "udp port 4789"])
+    cap = capsys.readouterr()
+    assert (
+        cap.out
+        == """
+static inline u32
+cbpf_filter_func (const u8 *const data, const u8 *const data_end) {
+	__attribute__((unused)) u32 A, X, M[16];
+	__attribute__((unused)) const u8 *indirect;
+
+	if (data + 12 + 2 > data_end) { return 0; }
+	A = bpf_ntohs(*((u16 *)(data + 12)));
+	if (A != 0x86dd) {goto label8;}
+	if (data + 20 + 1 > data_end) { return 0; }
+	A = *(data + 20);
+	if (A != 0x11) {goto label19;}
+	if (data + 54 + 2 > data_end) { return 0; }
+	A = bpf_ntohs(*((u16 *)(data + 54)));
+	if (A == 0x12b5) {goto label18;}
+	if (data + 56 + 2 > data_end) { return 0; }
+	A = bpf_ntohs(*((u16 *)(data + 56)));
+	if (A == 0x12b5){goto label18;} else { goto label19;}
+label8:
+	if (A != 0x800) {goto label19;}
+	if (data + 23 + 1 > data_end) { return 0; }
+	A = *(data + 23);
+	if (A != 0x11) {goto label19;}
+	if (data + 20 + 2 > data_end) { return 0; }
+	A = bpf_ntohs(*((u16 *)(data + 20)));
+	if (A & 0x1fff) {goto label19;}
+	if (data + 14 + 1 > data_end) { return 0; }
+	X = *(data + 14);X = (X & 0xF)<< 2;
+	if (data + X > data_end) {return 0;}
+	indirect = data + X;
+	if (indirect + 14 + 2 > data_end) {return 0;}
+	A = bpf_ntohs(*((u16 *)(indirect + 14)));
+	if (A == 0x12b5) {goto label18;}
+	if (data + X > data_end) {return 0;}
+	indirect = data + X;
+	if (indirect + 16 + 2 > data_end) {return 0;}
+	A = bpf_ntohs(*((u16 *)(indirect + 16)));
+	if (A != 0x12b5) {goto label19;}
+label18:
+	return 262144;
+label19:
+	return 0;
+}
+"""
+    )

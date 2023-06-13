@@ -59,6 +59,7 @@ def test_filter_2_cbpf():
         "tcp[tcpflags] & (tcp-syn|tcp-ack) != 0",
         "icmp[0] != 8 and icmp[0] != 0",
         "udp[42:4]=0xAC100009",
+        "geneve",
     ]
     for case in cases:
         assert verify_cbpf_prog(case)

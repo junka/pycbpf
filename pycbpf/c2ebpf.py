@@ -69,7 +69,7 @@ class FilterPacket(ctypes.Structure):  # pylint: disable=too-few-public-methods
     _fields_ = [("packet", ctypes.c_ubyte * 128)]
 
 
-def main():
+def main(argv=None):
     """
     ref https://github.com/iovisor/bcc/blob/master/examples/networking/dns_matching/dns_matching.py
     ret https://github.com/iovisor/bcc/blob/master/examples/tracing/undump.py
@@ -95,7 +95,7 @@ def main():
         help="number of packets to capture",
     )
     parser.add_argument("filter", nargs=argparse.REMAINDER)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.filter is None or len(args.filter) == 0:
         cfun = """static inline u32
@@ -109,11 +109,11 @@ cbpf_filter_func (const u8 *const data __attribute__((unused)), const u8 *const 
         cfun = prog_c.compile_cbpf_to_c()
 
     text = BPFTEXT % cfun
-    bctx = BPF(text=text, debug=0)
+    bctx = BPF(text=text.encode(), debug=0)
 
     # func_name = "__netif_receive_skb"
-    func_name = "dev_queue_xmit"
-    bctx.attach_kprobe(event=func_name, fn_name="filter_packets")
+    func_name = b"dev_queue_xmit"
+    bctx.attach_kprobe(event=func_name, fn_name=b"filter_packets")
     pcap_dev = pcap.open_dead(pcap.DLT_EN10MB, 1000)
     # if args.file == '-':
     #     tmp = tempfile.NamedTemporaryFile()
@@ -138,26 +138,14 @@ cbpf_filter_func (const u8 *const data __attribute__((unused)), const u8 *const 
             ctypes.cast(dumper, ctypes.POINTER(ctypes.c_ubyte)), hdr, event.packet
         )
 
-    bctx["filter_event"].open_perf_buffer(filter_events_cb)
-
-    # if args.file == '-':
-    #     proc = subprocess.Popen(["tcpdump", "-r", "-", "-nev"], stdin=tmp,
-    #                             stdout=subprocess.PIPE, shell=False)
+    bctx[b"filter_event"].open_perf_buffer(filter_events_cb)
 
     while counter < args.count:
         try:
             bctx.perf_buffer_poll(timeout=1000)
-            # if args.file == '-' and proc.poll() is None:
-            #     output = proc.communicate(tmp.read())[0]
-            #     print(output)
-            #     line = proc.stdout.readline().strip(b'\n')
-            #     print(line.decode())
         except KeyboardInterrupt:
             pcap.dump_close(dumper)
             pcap.close(pcap_dev)
-            # if args.file == '-':
-            #     proc.stdout.close()
-            #     tmp.close()
             sys.exit()
     print(f"{counter} packets cpatured")
     pcap.dump_close(dumper)

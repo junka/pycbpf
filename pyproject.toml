@@ -20,6 +20,10 @@ dependencies = [
     "libpcap",
 ]
 
+[project.scripts]
+pycap = "pycbpf.c2ebpf:main"
+pycbpf = "pycbpf.cbpf2c:main"
+
 [project.urls]
 "Homepage" = "https://github.com/junka/pycbpf"
 "Bug Tracker" = "https://github.com/junka/pycbpf/issues"

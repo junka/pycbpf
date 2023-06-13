@@ -177,11 +177,13 @@ class CbpfC:  # pylint: disable=too-few-public-methods
         the source operand is src. The op field specifies which ALU or branch
         operation is to be performed.
         """
-        ctext = """\nstatic inline u32
-cbpf_filter_func (const u8 *const data, const u8 *const data_end) {
-	__attribute__((unused)) u32 A, X, M[16];
-	__attribute__((unused)) const u8 *indirect;
-"""
+        ctext = (
+            "\nstatic inline u32\n"
+            + "cbpf_filter_func (const u8 *const data, const u8 *const data_end) {\n"
+            + "\t__attribute__((unused)) u32 A, X, M[16];\n"
+            + "\t__attribute__((unused)) const u8 *indirect;\n"
+        )
+
         for ins in self._bpf.ins:
             ctext += "\n"
             if self._jump_labels.get(self._pc) is not None:
@@ -261,7 +263,7 @@ cbpf_filter_func (const u8 *const data, const u8 *const data_end) {
         return miscstr
 
 
-def main():
+def main(argv=None):
     """
     This function takes command line arguments for running tcpdump and compiles
     a C function for a given filter.
@@ -269,7 +271,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--iface", help="interface name to run tcpdump")
     parser.add_argument("filter", nargs=argparse.REMAINDER)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.filter and len(args.filter) > 0:
         prog = CbpfProg(args.filter)
         prog_c = CbpfC(prog)
